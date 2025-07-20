@@ -9,7 +9,7 @@ const Proxies = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [bulkText, setBulkText] = useState('');
-  const [bulkFormat, setBulkFormat] = useState('csv'); // csv, txt, json
+  const [bulkFormat, setBulkFormat] = useState('csv');
   const [newProxy, setNewProxy] = useState({
     ip: '',
     port: '',
@@ -25,7 +25,6 @@ const Proxies = () => {
   const fetchProxies = async () => {
     try {
       const response = await api.get('/api/proxies');
-      // Ensure we have valid data
       const proxiesData = Array.isArray(response.data?.proxies) ? response.data.proxies : [];
       setProxies(proxiesData);
     } catch (error) {
@@ -74,7 +73,6 @@ const Proxies = () => {
         let proxy = {};
 
         if (format === 'csv') {
-          // Format: ip,port,username,password,country
           const parts = line.split(',').map(p => p.trim());
           if (parts.length >= 2) {
             proxy = {
@@ -86,7 +84,6 @@ const Proxies = () => {
             };
           }
         } else if (format === 'txt') {
-          // Format: ip:port:username:password:country
           const parts = line.split(':').map(p => p.trim());
           if (parts.length >= 2) {
             proxy = {
@@ -98,7 +95,6 @@ const Proxies = () => {
             };
           }
         } else if (format === 'json') {
-          // Format: {"ip":"1.2.3.4","port":"8080","username":"user","password":"pass","country":"US"}
           try {
             proxy = JSON.parse(line);
           } catch (e) {
@@ -139,7 +135,6 @@ const Proxies = () => {
     setUploadProgress(0);
 
     try {
-      // Split into chunks of 1000 for better performance
       const chunkSize = 1000;
       const chunks = [];
       
@@ -163,7 +158,6 @@ const Proxies = () => {
           totalSkipped += response.data.results.skipped;
           totalErrors += response.data.results.errors.length;
 
-          // Update progress
           const progress = ((i + 1) / chunks.length) * 100;
           setUploadProgress(progress);
         } catch (error) {
@@ -252,15 +246,15 @@ const Proxies = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
+    <div className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6">إدارة البروكسيات</h1>
-      
+
       {/* إضافة بروكسي جديد */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <h2 className="text-lg font-semibold mb-4">إضافة بروكسي جديد</h2>
@@ -350,11 +344,11 @@ const Proxies = () => {
               >
                 <option value="csv">CSV (ip,port,username,password,country)</option>
                 <option value="txt">TXT (ip:port:username:password:country)</option>
-                <option value="json">JSON ({"ip":"1.2.3.4","port":"8080"})</option>
+                <option value="json">
+                  JSON (&#123;&quot;ip&quot;:&quot;1.2.3.4&quot;,&quot;port&quot;:&quot;8080&quot;,&quot;username&quot;:&quot;user&quot;,&quot;password&quot;:&quot;pass&quot;,&quot;country&quot;:&quot;US&quot;&#125;)
+                </option>
               </select>
             </div>
-
-            {/* Download Sample Button */}
             <div>
               <button
                 onClick={() => downloadSampleFile(bulkFormat)}
@@ -407,7 +401,14 @@ const Proxies = () => {
               <div className="text-sm text-gray-600 space-y-2">
                 <div><strong>CSV:</strong> ip,port,username,password,country</div>
                 <div><strong>TXT:</strong> ip:port:username:password:country</div>
-                <div><strong>JSON:</strong> {"ip":"1.2.3.4","port":"8080","username":"user","password":"pass","country":"US"}</div>
+                <div>
+                  <strong>JSON:</strong>{' '}
+                  <span>
+                    {'{'}
+                    "ip":"1.2.3.4","port":"8080","username":"user","password":"pass","country":"US"
+                    {'}'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
