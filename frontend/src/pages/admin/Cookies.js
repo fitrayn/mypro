@@ -51,20 +51,40 @@ const Cookies = () => {
     }
 
     try {
-      const cookieStrings = bulkCookies.split('\n').filter(cookie => cookie.trim());
+      const cookieStrings = bulkCookies.split('\n')
+        .map(cookie => cookie.trim())
+        .filter(cookie => cookie.length > 0);
+      
+      if (cookieStrings.length === 0) {
+        toast.error('لا توجد كوكيز صحيحة للإضافة');
+        return;
+      }
+
       const cookieList = cookieStrings.map(cookie => ({
-        cookie: cookie.trim(),
+        cookie: cookie,
         label: '',
         notes: ''
       }));
       
-      await api.post('/api/cookies/bulk', { cookies: cookieList });
-      toast.success('تم إضافة الكوكيز بنجاح');
+      console.log('Sending cookies:', cookieList);
+      
+      const response = await api.post('/api/cookies/bulk', { cookies: cookieList });
+      
+      if (response.data?.results) {
+        const { added, skipped, errors } = response.data.results;
+        let message = `تم إضافة ${added} كوكي بنجاح`;
+        if (skipped > 0) message += `، تم تخطي ${skipped} كوكي مكرر`;
+        if (errors.length > 0) message += `، ${errors.length} أخطاء`;
+        toast.success(message);
+      } else {
+        toast.success('تم إضافة الكوكيز بنجاح');
+      }
+      
       setBulkCookies('');
       fetchCookies();
     } catch (error) {
       console.error('Add bulk cookies error:', error);
-      const message = error.response?.data?.error || 'فشل في إضافة الكوكيز';
+      const message = error.response?.data?.error || error.response?.data?.errors?.[0]?.msg || 'فشل في إضافة الكوكيز';
       toast.error(message);
     }
   };
