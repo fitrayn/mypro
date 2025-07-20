@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import axios from 'axios';
+import api from '../../utils/api';
 
 const Users = () => {
   const [users, setUsers] = useState([]);
@@ -12,14 +12,14 @@ const Users = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get('/api/admin/users', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      setUsers(response.data);
+      const response = await api.get('/api/admin/users');
+      // Ensure we have valid data
+      const usersData = Array.isArray(response.data?.users) ? response.data.users : [];
+      setUsers(usersData);
     } catch (error) {
+      console.error('Fetch users error:', error);
       toast.error('فشل في تحميل المستخدمين');
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -27,17 +27,11 @@ const Users = () => {
 
   const updateWallet = async (userId, amount) => {
     try {
-      await axios.patch(`/api/admin/users/${userId}/wallet`, 
-        { amount },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`
-          }
-        }
-      );
+      await api.patch(`/api/admin/users/${userId}/wallet`, { amount });
       toast.success('تم تحديث المحفظة بنجاح');
       fetchUsers();
     } catch (error) {
+      console.error('Update wallet error:', error);
       toast.error('فشل في تحديث المحفظة');
     }
   };
@@ -76,34 +70,42 @@ const Users = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {users.map((user) => (
-              <tr key={user._id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {user.email}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  ${user.wallet}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    user.isAdmin ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {user.isAdmin ? 'نعم' : 'لا'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {new Date(user.createdAt).toLocaleDateString('ar-SA')}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button
-                    onClick={() => updateWallet(user._id, 100)}
-                    className="text-blue-600 hover:text-blue-900 ml-4"
-                  >
-                    إضافة $100
-                  </button>
+            {Array.isArray(users) && users.length > 0 ? (
+              users.map((user) => (
+                <tr key={user._id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {user.email}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    ${user.wallet}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      user.isAdmin ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {user.isAdmin ? 'نعم' : 'لا'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {new Date(user.createdAt).toLocaleDateString('ar-SA')}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button
+                      onClick={() => updateWallet(user._id, 100)}
+                      className="text-blue-600 hover:text-blue-900 ml-4"
+                    >
+                      إضافة $100
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                  لا يوجد مستخدمين
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>

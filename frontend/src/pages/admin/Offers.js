@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import axios from 'axios';
+import api from '../../utils/api';
 
 const Offers = () => {
   const [offers, setOffers] = useState([]);
@@ -23,10 +23,14 @@ const Offers = () => {
 
   const fetchOffers = async () => {
     try {
-      const response = await axios.get('/api/offers');
-      setOffers(response.data);
+      const response = await api.get('/api/offers');
+      // Ensure we have valid data
+      const offersData = Array.isArray(response.data?.offers) ? response.data.offers : [];
+      setOffers(offersData);
     } catch (error) {
+      console.error('Fetch offers error:', error);
       toast.error('فشل في تحميل العروض');
+      setOffers([]);
     } finally {
       setLoading(false);
     }
@@ -39,14 +43,7 @@ const Offers = () => {
     }
 
     try {
-      await axios.post('/api/offers', 
-        newOffer,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`
-          }
-        }
-      );
+      await api.post('/api/offers', newOffer);
       toast.success('تم إضافة العرض بنجاح');
       setNewOffer({
         title: '',
@@ -61,23 +58,18 @@ const Offers = () => {
       });
       fetchOffers();
     } catch (error) {
+      console.error('Add offer error:', error);
       toast.error('فشل في إضافة العرض');
     }
   };
 
   const toggleOfferStatus = async (offerId, isActive) => {
     try {
-      await axios.patch(`/api/offers/${offerId}`, 
-        { isActive: !isActive },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`
-          }
-        }
-      );
+      await api.patch(`/api/offers/${offerId}`, { isActive: !isActive });
       toast.success('تم تحديث حالة العرض بنجاح');
       fetchOffers();
     } catch (error) {
+      console.error('Toggle offer status error:', error);
       toast.error('فشل في تحديث حالة العرض');
     }
   };
@@ -192,46 +184,54 @@ const Offers = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {offers.map((offer) => (
-              <tr key={offer._id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <div>
-                    <div className="font-medium">{offer.title}</div>
-                    <div className="text-gray-500 text-xs">{offer.description}</div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <div>
-                    <div>إعجابات: {offer.likes}</div>
-                    <div>تعليقات: {offer.comments}</div>
-                    <div>متابعات: {offer.follows}</div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  ${offer.price}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {offer.category || 'غير محدد'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    offer.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                    {offer.isActive ? 'نشط' : 'غير نشط'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button
-                    onClick={() => toggleOfferStatus(offer._id, offer.isActive)}
-                    className={`${
-                      offer.isActive ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'
-                    }`}
-                  >
-                    {offer.isActive ? 'إيقاف' : 'تفعيل'}
-                  </button>
+            {Array.isArray(offers) && offers.length > 0 ? (
+              offers.map((offer) => (
+                <tr key={offer._id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <div>
+                      <div className="font-medium">{offer.title}</div>
+                      <div className="text-gray-500 text-xs">{offer.description}</div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <div>
+                      <div>إعجابات: {offer.likes}</div>
+                      <div>تعليقات: {offer.comments}</div>
+                      <div>متابعات: {offer.follows}</div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    ${offer.price}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {offer.category || 'غير محدد'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      offer.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {offer.isActive ? 'نشط' : 'غير نشط'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button
+                      onClick={() => toggleOfferStatus(offer._id, offer.isActive)}
+                      className={`${
+                        offer.isActive ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'
+                      }`}
+                    >
+                      {offer.isActive ? 'إيقاف' : 'تفعيل'}
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                  لا توجد عروض
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>

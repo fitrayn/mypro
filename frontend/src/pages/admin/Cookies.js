@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import axios from 'axios';
+import api from '../../utils/api';
 
 const Cookies = () => {
   const [cookies, setCookies] = useState([]);
@@ -14,14 +14,14 @@ const Cookies = () => {
 
   const fetchCookies = async () => {
     try {
-      const response = await axios.get('/api/cookies', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      setCookies(response.data);
+      const response = await api.get('/api/cookies');
+      // Ensure we have valid data
+      const cookiesData = Array.isArray(response.data?.cookies) ? response.data.cookies : [];
+      setCookies(cookiesData);
     } catch (error) {
+      console.error('Fetch cookies error:', error);
       toast.error('فشل في تحميل الكوكيز');
+      setCookies([]);
     } finally {
       setLoading(false);
     }
@@ -34,18 +34,12 @@ const Cookies = () => {
     }
 
     try {
-      await axios.post('/api/cookies', 
-        { cookie: newCookie },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`
-          }
-        }
-      );
+      await api.post('/api/cookies', { cookie: newCookie });
       toast.success('تم إضافة الكوكي بنجاح');
       setNewCookie('');
       fetchCookies();
     } catch (error) {
+      console.error('Add cookie error:', error);
       toast.error('فشل في إضافة الكوكي');
     }
   };
@@ -58,18 +52,12 @@ const Cookies = () => {
 
     try {
       const cookieList = bulkCookies.split('\n').filter(cookie => cookie.trim());
-      await axios.post('/api/cookies/bulk', 
-        { cookies: cookieList },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`
-          }
-        }
-      );
+      await api.post('/api/cookies/bulk', { cookies: cookieList });
       toast.success('تم إضافة الكوكيز بنجاح');
       setBulkCookies('');
       fetchCookies();
     } catch (error) {
+      console.error('Add bulk cookies error:', error);
       toast.error('فشل في إضافة الكوكيز');
     }
   };
@@ -152,28 +140,36 @@ const Cookies = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {cookies.map((cookie) => (
-              <tr key={cookie._id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <div className="max-w-xs truncate" title={cookie.cookie}>
-                    {cookie.cookie.substring(0, 50)}...
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(cookie.status)}`}>
-                    {cookie.status === 'active' && 'نشط'}
-                    {cookie.status === 'dead' && 'غير صالح'}
-                    {cookie.status === 'needs_verification' && 'يحتاج فحص'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {cookie.usageCount || 0}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {cookie.lastChecked ? new Date(cookie.lastChecked).toLocaleDateString('ar-SA') : 'لم يتم الفحص'}
+            {Array.isArray(cookies) && cookies.length > 0 ? (
+              cookies.map((cookie) => (
+                <tr key={cookie._id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <div className="max-w-xs truncate" title={cookie.cookie}>
+                      {cookie.cookie.substring(0, 50)}...
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(cookie.status)}`}>
+                      {cookie.status === 'active' && 'نشط'}
+                      {cookie.status === 'dead' && 'غير صالح'}
+                      {cookie.status === 'needs_verification' && 'يحتاج فحص'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {cookie.usageCount || 0}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {cookie.lastChecked ? new Date(cookie.lastChecked).toLocaleDateString('ar-SA') : 'لم يتم الفحص'}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="4" className="px-6 py-4 text-center text-gray-500">
+                  لا توجد كوكيز
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>
