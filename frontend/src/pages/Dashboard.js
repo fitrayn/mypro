@@ -14,7 +14,7 @@ import {
 const Dashboard = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState({});
-  const [offers, setOffers] = useState([]);
+  const [offers, setOffers] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [targetUrl, setTargetUrl] = useState('');
