@@ -3,6 +3,7 @@ const Cookie = require('../models/Cookie');
 const Order = require('../models/Order');
 const User = require('../models/User');
 const logger = require('../utils/logger');
+const axios = require('axios');
 
 class AutomationService {
   constructor() {
@@ -153,6 +154,33 @@ class AutomationService {
     }
   }
 
+  async updateOrderStatus(orderId, status, results = null, successCount = 0, error = null) {
+    try {
+      const order = await Order.findById(orderId);
+      if (!order) {
+        throw new Error('Order not found');
+      }
+
+      // تحديث حالة الطلب
+      order.status = status;
+      if (results) order.results = results;
+      if (successCount !== undefined) order.successCount = successCount;
+      if (error) order.error = error;
+      
+      if (status === 'running') {
+        order.startedAt = new Date();
+      } else if (status === 'done' || status === 'failed' || status === 'cancelled') {
+        order.completedAt = new Date();
+      }
+
+      await order.save();
+      logger.info(`Order ${orderId} status updated to ${status}`);
+    } catch (error) {
+      logger.error('Failed to update order status:', error);
+      throw error;
+    }
+  }
+
   async executeOrder(order) {
     try {
       if (this.isRunning) {
@@ -162,11 +190,8 @@ class AutomationService {
       this.isRunning = true;
       logger.info(`Starting order execution: ${order._id}`);
 
-      // تحديث حالة الطلب
-      await Order.findByIdAndUpdate(order._id, { 
-        status: 'running',
-        startedAt: new Date()
-      });
+      // تحديث حالة الطلب إلى running
+      await this.updateOrderStatus(order._id, 'running');
 
       // الحصول على كوكي عامل
       const cookie = await this.getWorkingCookie();
@@ -237,14 +262,9 @@ class AutomationService {
       await this.browser.close();
       this.browser = null;
 
-      // تحديث حالة الطلب
+      // تحديث حالة الطلب النهائية
       const finalStatus = successCount > 0 ? 'done' : 'failed';
-      await Order.findByIdAndUpdate(order._id, {
-        status: finalStatus,
-        completedAt: new Date(),
-        results: results,
-        successCount: successCount
-      });
+      await this.updateOrderStatus(order._id, finalStatus, results, successCount);
 
       // تحديث استخدام الكوكي
       await Cookie.findByIdAndUpdate(cookie._id, {
@@ -265,11 +285,7 @@ class AutomationService {
       logger.error(`Order execution failed: ${order._id}`, error);
       
       // تحديث حالة الطلب إلى فشل
-      await Order.findByIdAndUpdate(order._id, {
-        status: 'failed',
-        completedAt: new Date(),
-        error: error.message
-      });
+      await this.updateOrderStatus(order._id, 'failed', null, 0, error.message);
 
       if (this.browser) {
         await this.browser.close();

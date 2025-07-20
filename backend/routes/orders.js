@@ -44,7 +44,6 @@ router.get('/:id', auth, async (req, res) => {
 // Place bundle order
 router.post('/bundle', [
   auth,
-  rateLimitMiddleware,
   body('offerId').isMongoId(),
   body('targetUrl').isURL(),
 ], async (req, res) => {
@@ -110,7 +109,6 @@ router.post('/bundle', [
 // Place custom order
 router.post('/custom', [
   auth,
-  rateLimitMiddleware,
   body('targetUrl').isURL(),
   body('likes').isInt({ min: 0 }),
   body('comments').isInt({ min: 0 }),
@@ -218,5 +216,93 @@ router.get('/stats/summary', auth, async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch order statistics.' });
   }
 });
+
+// Update order status (for automation service)
+router.patch('/:id/status', auth, async (req, res) => {
+  try {
+    const { status, results, successCount, error } = req.body;
+    
+    const order = await Order.findOne({ 
+      _id: req.params.id, 
+      userId: req.user._id 
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found.' });
+    }
+
+    // Update order status
+    order.status = status;
+    if (results) order.results = results;
+    if (successCount !== undefined) order.successCount = successCount;
+    if (error) order.error = error;
+    
+    if (status === 'running') {
+      order.startedAt = new Date();
+    } else if (status === 'done' || status === 'failed' || status === 'cancelled') {
+      order.completedAt = new Date();
+    }
+
+    await order.save();
+
+    logger.info(`Order ${order._id} status updated to ${status} by user ${req.user.email}`);
+
+    res.json({
+      message: 'Order status updated successfully',
+      order: {
+        id: order._id,
+        status: order.status,
+        results: order.results,
+        successCount: order.successCount,
+        error: order.error,
+        startedAt: order.startedAt,
+        completedAt: order.completedAt
+      }
+    });
+  } catch (error) {
+    logger.error('Update order status error:', error);
+    res.status(500).json({ error: 'Failed to update order status.' });
+  }
+});
+
+// Get order with real-time status
+router.get('/:id/status', auth, async (req, res) => {
+  try {
+    const order = await Order.findOne({ 
+      _id: req.params.id, 
+      userId: req.user._id 
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found.' });
+    }
+
+    res.json({
+      order: {
+        id: order._id,
+        status: order.status,
+        results: order.results,
+        successCount: order.successCount,
+        error: order.error,
+        startedAt: order.startedAt,
+        completedAt: order.completedAt,
+        progress: calculateProgress(order)
+      }
+    });
+  } catch (error) {
+    logger.error('Get order status error:', error);
+    res.status(500).json({ error: 'Failed to fetch order status.' });
+  }
+});
+
+// Helper function to calculate progress
+function calculateProgress(order) {
+  if (order.status === 'pending') return 0;
+  if (order.status === 'running') return 50;
+  if (order.status === 'done') return 100;
+  if (order.status === 'failed' || order.status === 'cancelled') return 0;
+  
+  return 0;
+}
 
 module.exports = router; 

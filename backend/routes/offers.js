@@ -1,17 +1,15 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { adminAuth } = require('../middlewares/auth');
+const { auth, adminAuth } = require('../middlewares/auth');
 const Offer = require('../models/Offer');
 const logger = require('../utils/logger');
 
 const router = express.Router();
 
-// Get all offers (public route for users)
-router.get('/', async (req, res) => {
+// Get all active offers
+router.get('/', auth, async (req, res) => {
   try {
-    const offers = await Offer.find({ isActive: true })
-      .sort({ sortOrder: 1, price: 1 });
-
+    const offers = await Offer.find({ isActive: true }).sort({ price: 1 });
     res.json({ offers });
   } catch (error) {
     logger.error('Get offers error:', error);
@@ -19,63 +17,15 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get all offers (admin route)
-router.get('/admin', adminAuth, async (req, res) => {
-  try {
-    const { page = 1, limit = 20, category = '', active = '' } = req.query;
-    
-    const query = {};
-    if (category) query.category = category;
-    if (active !== '') query.isActive = active === 'true';
-    
-    const offers = await Offer.find(query)
-      .sort({ sortOrder: 1, createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
-
-    const total = await Offer.countDocuments(query);
-
-    res.json({
-      offers,
-      totalPages: Math.ceil(total / limit),
-      currentPage: page,
-      total
-    });
-  } catch (error) {
-    logger.error('Get offers admin error:', error);
-    res.status(500).json({ error: 'Failed to fetch offers.' });
-  }
-});
-
-// Get specific offer
-router.get('/:id', async (req, res) => {
-  try {
-    const offer = await Offer.findById(req.params.id);
-    
-    if (!offer || (!offer.isActive && !req.user?.isAdmin)) {
-      return res.status(404).json({ error: 'Offer not found.' });
-    }
-
-    res.json({ offer });
-  } catch (error) {
-    logger.error('Get offer error:', error);
-    res.status(500).json({ error: 'Failed to fetch offer.' });
-  }
-});
-
-// Create offer
+// Create new offer (admin only)
 router.post('/', [
   adminAuth,
-  body('title').notEmpty(),
-  body('description').optional(),
-  body('likes').isInt({ min: 0 }),
-  body('comments').isInt({ min: 0 }),
-  body('follows').isInt({ min: 0 }),
-  body('price').isFloat({ min: 0 }),
-  body('category').optional(),
-  body('deliveryTime').optional(),
-  body('features').optional().isArray(),
-  body('sortOrder').optional().isInt(),
+  body('name').notEmpty().withMessage('اسم العرض مطلوب'),
+  body('description').notEmpty().withMessage('وصف العرض مطلوب'),
+  body('likes').isInt({ min: 0 }).withMessage('عدد الإعجابات يجب أن يكون رقم موجب'),
+  body('comments').isInt({ min: 0 }).withMessage('عدد التعليقات يجب أن يكون رقم موجب'),
+  body('follows').isInt({ min: 0 }).withMessage('عدد المتابعات يجب أن يكون رقم موجب'),
+  body('price').isFloat({ min: 0 }).withMessage('السعر يجب أن يكون رقم موجب'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -83,45 +33,24 @@ router.post('/', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const {
-      title,
+    const { name, description, likes, comments, follows, price } = req.body;
+
+    const offer = new Offer({
+      name,
       description,
       likes,
       comments,
       follows,
-      price,
-      category,
-      deliveryTime,
-      features,
-      sortOrder
-    } = req.body;
-
-    // Check if offer with same title exists
-    const existingOffer = await Offer.findOne({ title });
-    if (existingOffer) {
-      return res.status(400).json({ error: 'Offer with this title already exists.' });
-    }
-
-    const newOffer = new Offer({
-      title,
-      description: description || '',
-      likes,
-      comments,
-      follows,
-      price,
-      category: category || 'standard',
-      deliveryTime: deliveryTime || '24-48 hours',
-      features: features || [],
-      sortOrder: sortOrder || 0
+      price
     });
 
-    await newOffer.save();
+    await offer.save();
 
-    logger.info(`Offer created: ${newOffer._id}`);
+    logger.info(`New offer created: ${offer._id} by admin`);
 
     res.status(201).json({
       message: 'Offer created successfully',
-      offer: newOffer
+      offer
     });
   } catch (error) {
     logger.error('Create offer error:', error);
@@ -129,20 +58,15 @@ router.post('/', [
   }
 });
 
-// Update offer
-router.patch('/:id', [
+// Update offer (admin only)
+router.put('/:id', [
   adminAuth,
-  body('title').optional().notEmpty(),
-  body('description').optional(),
-  body('likes').optional().isInt({ min: 0 }),
-  body('comments').optional().isInt({ min: 0 }),
-  body('follows').optional().isInt({ min: 0 }),
-  body('price').optional().isFloat({ min: 0 }),
-  body('isActive').optional().isBoolean(),
-  body('category').optional(),
-  body('deliveryTime').optional(),
-  body('features').optional().isArray(),
-  body('sortOrder').optional().isInt(),
+  body('name').optional().notEmpty().withMessage('اسم العرض مطلوب'),
+  body('description').optional().notEmpty().withMessage('وصف العرض مطلوب'),
+  body('likes').optional().isInt({ min: 0 }).withMessage('عدد الإعجابات يجب أن يكون رقم موجب'),
+  body('comments').optional().isInt({ min: 0 }).withMessage('عدد التعليقات يجب أن يكون رقم موجب'),
+  body('follows').optional().isInt({ min: 0 }).withMessage('عدد المتابعات يجب أن يكون رقم موجب'),
+  body('price').optional().isFloat({ min: 0 }).withMessage('السعر يجب أن يكون رقم موجب'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -150,29 +74,17 @@ router.patch('/:id', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const offer = await Offer.findById(req.params.id);
+    const offer = await Offer.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+
     if (!offer) {
       return res.status(404).json({ error: 'Offer not found.' });
     }
 
-    // Check if title is being changed and if it conflicts
-    if (req.body.title && req.body.title !== offer.title) {
-      const existingOffer = await Offer.findOne({ title: req.body.title });
-      if (existingOffer) {
-        return res.status(400).json({ error: 'Offer with this title already exists.' });
-      }
-    }
-
-    // Update fields
-    Object.keys(req.body).forEach(key => {
-      if (req.body[key] !== undefined) {
-        offer[key] = req.body[key];
-      }
-    });
-
-    await offer.save();
-
-    logger.info(`Offer updated: ${offer._id}`);
+    logger.info(`Offer updated: ${offer._id} by admin`);
 
     res.json({
       message: 'Offer updated successfully',
@@ -184,27 +96,7 @@ router.patch('/:id', [
   }
 });
 
-// Delete offer
-router.delete('/:id', adminAuth, async (req, res) => {
-  try {
-    const offer = await Offer.findById(req.params.id);
-    
-    if (!offer) {
-      return res.status(404).json({ error: 'Offer not found.' });
-    }
-
-    await offer.deleteOne();
-
-    logger.info(`Offer deleted: ${offer._id}`);
-
-    res.json({ message: 'Offer deleted successfully' });
-  } catch (error) {
-    logger.error('Delete offer error:', error);
-    res.status(500).json({ error: 'Failed to delete offer.' });
-  }
-});
-
-// Toggle offer active status
+// Toggle offer status (admin only)
 router.patch('/:id/toggle', adminAuth, async (req, res) => {
   try {
     const offer = await Offer.findById(req.params.id);
@@ -216,7 +108,7 @@ router.patch('/:id/toggle', adminAuth, async (req, res) => {
     offer.isActive = !offer.isActive;
     await offer.save();
 
-    logger.info(`Offer ${offer._id} ${offer.isActive ? 'activated' : 'deactivated'}`);
+    logger.info(`Offer ${offer._id} status toggled to ${offer.isActive} by admin`);
 
     res.json({
       message: `Offer ${offer.isActive ? 'activated' : 'deactivated'} successfully`,
@@ -228,45 +120,87 @@ router.patch('/:id/toggle', adminAuth, async (req, res) => {
   }
 });
 
-// Get offer statistics
-router.get('/stats/summary', adminAuth, async (req, res) => {
+// Delete offer (admin only)
+router.delete('/:id', adminAuth, async (req, res) => {
   try {
-    const stats = await Offer.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalOffers: { $sum: 1 },
-          activeOffers: { $sum: { $cond: ['$isActive', 1, 0] } },
-          totalRevenue: { $sum: '$price' },
-          avgPrice: { $avg: '$price' }
-        }
-      }
-    ]);
+    const offer = await Offer.findByIdAndDelete(req.params.id);
+    
+    if (!offer) {
+      return res.status(404).json({ error: 'Offer not found.' });
+    }
 
-    const categoryStats = await Offer.aggregate([
-      {
-        $group: {
-          _id: '$category',
-          count: { $sum: 1 },
-          avgPrice: { $avg: '$price' }
-        }
-      }
-    ]);
-
-    const summary = stats[0] || {
-      totalOffers: 0,
-      activeOffers: 0,
-      totalRevenue: 0,
-      avgPrice: 0
-    };
+    logger.info(`Offer deleted: ${offer._id} by admin`);
 
     res.json({
-      summary,
-      categoryStats
+      message: 'Offer deleted successfully'
     });
   } catch (error) {
-    logger.error('Get offer stats error:', error);
-    res.status(500).json({ error: 'Failed to fetch offer statistics.' });
+    logger.error('Delete offer error:', error);
+    res.status(500).json({ error: 'Failed to delete offer.' });
+  }
+});
+
+// Initialize default offers (admin only)
+router.post('/initialize', adminAuth, async (req, res) => {
+  try {
+    // حذف العروض الموجودة
+    await Offer.deleteMany({});
+
+    // إنشاء عروض افتراضية
+    const defaultOffers = [
+      {
+        name: 'عرض البداية',
+        description: 'عرض مثالي للمبتدئين - تفاعل بسيط وفعال',
+        likes: 10,
+        comments: 5,
+        follows: 3,
+        price: 0.18
+      },
+      {
+        name: 'عرض النشاط',
+        description: 'عرض متوازن لزيادة النشاط على صفحتك',
+        likes: 25,
+        comments: 10,
+        follows: 8,
+        price: 0.43
+      },
+      {
+        name: 'عرض الشعبية',
+        description: 'عرض قوي لزيادة الشعبية والتفاعل',
+        likes: 50,
+        comments: 20,
+        follows: 15,
+        price: 0.85
+      },
+      {
+        name: 'عرض النجوم',
+        description: 'عرض احترافي للوصول للنجومية',
+        likes: 100,
+        comments: 40,
+        follows: 30,
+        price: 1.70
+      },
+      {
+        name: 'عرض القمة',
+        description: 'عرض VIP للوصول لأعلى مستويات التفاعل',
+        likes: 200,
+        comments: 80,
+        follows: 60,
+        price: 3.40
+      }
+    ];
+
+    const offers = await Offer.insertMany(defaultOffers);
+
+    logger.info(`Default offers initialized: ${offers.length} offers created`);
+
+    res.json({
+      message: 'Default offers initialized successfully',
+      offers
+    });
+  } catch (error) {
+    logger.error('Initialize offers error:', error);
+    res.status(500).json({ error: 'Failed to initialize offers.' });
   }
 });
 
