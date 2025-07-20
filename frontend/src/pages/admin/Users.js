@@ -5,6 +5,9 @@ import api from '../../utils/api';
 const Users = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [walletAmount, setWalletAmount] = useState(100);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [showWalletModal, setShowWalletModal] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -31,13 +34,20 @@ const Users = () => {
         amount: parseFloat(amount),
         action
       });
-      toast.success(`تم ${action === 'add' ? 'إضافة' : 'خصم'} المال بنجاح`);
+      toast.success(`تم ${action === 'add' ? 'إضافة' : 'خصم'} ${amount} جنيه بنجاح`);
       fetchUsers();
+      setShowWalletModal(false);
+      setSelectedUser(null);
     } catch (error) {
       console.error('Update wallet error:', error);
       const message = error.response?.data?.error || 'فشل في تحديث المحفظة';
       toast.error(message);
     }
+  };
+
+  const handleWalletUpdate = (user, action) => {
+    setSelectedUser({ ...user, action });
+    setShowWalletModal(true);
   };
 
   if (loading) {
@@ -81,7 +91,7 @@ const Users = () => {
                     {user.email}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${user.wallet}
+                    {user.wallet} جنيه
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -96,16 +106,16 @@ const Users = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2 space-x-reverse">
                       <button
-                        onClick={() => updateWallet(user._id, 100, 'add')}
+                        onClick={() => handleWalletUpdate(user, 'add')}
                         className="text-green-600 hover:text-green-900"
                       >
-                        إضافة $100
+                        إضافة مال
                       </button>
                       <button
-                        onClick={() => updateWallet(user._id, 100, 'subtract')}
+                        onClick={() => handleWalletUpdate(user, 'subtract')}
                         className="text-red-600 hover:text-red-900"
                       >
-                        خصم $100
+                        خصم مال
                       </button>
                     </div>
                   </td>
@@ -121,6 +131,54 @@ const Users = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Wallet Update Modal */}
+      {showWalletModal && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96">
+            <h3 className="text-lg font-semibold mb-4">
+              {selectedUser.action === 'add' ? 'إضافة مال' : 'خصم مال'} - {selectedUser.email}
+            </h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                المبلغ (جنيه)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={walletAmount}
+                onChange={(e) => setWalletAmount(parseFloat(e.target.value) || 0)}
+                className="w-full border border-gray-300 rounded px-3 py-2"
+                placeholder="أدخل المبلغ"
+              />
+            </div>
+
+            <div className="flex justify-end space-x-2 space-x-reverse">
+              <button
+                onClick={() => {
+                  setShowWalletModal(false);
+                  setSelectedUser(null);
+                }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={() => updateWallet(selectedUser._id, walletAmount, selectedUser.action)}
+                className={`px-4 py-2 rounded ${
+                  selectedUser.action === 'add' 
+                    ? 'bg-green-600 text-white hover:bg-green-700' 
+                    : 'bg-red-600 text-white hover:bg-red-700'
+                }`}
+              >
+                {selectedUser.action === 'add' ? 'إضافة' : 'خصم'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
