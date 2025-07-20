@@ -25,14 +25,18 @@ const Users = () => {
     }
   };
 
-  const updateWallet = async (userId, amount) => {
+  const updateWallet = async (userId, amount, action = 'add') => {
     try {
-      await api.patch(`/api/admin/users/${userId}/wallet`, { amount });
-      toast.success('تم تحديث المحفظة بنجاح');
+      await api.patch(`/api/admin/users/${userId}/wallet`, { 
+        amount: parseFloat(amount),
+        action
+      });
+      toast.success(`تم ${action === 'add' ? 'إضافة' : 'خصم'} المال بنجاح`);
       fetchUsers();
     } catch (error) {
       console.error('Update wallet error:', error);
-      toast.error('فشل في تحديث المحفظة');
+      const message = error.response?.data?.error || 'فشل في تحديث المحفظة';
+      toast.error(message);
     }
   };
 
@@ -90,12 +94,20 @@ const Users = () => {
                     {new Date(user.createdAt).toLocaleDateString('ar-SA')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => updateWallet(user._id, 100)}
-                      className="text-blue-600 hover:text-blue-900 ml-4"
-                    >
-                      إضافة $100
-                    </button>
+                    <div className="flex space-x-2 space-x-reverse">
+                      <button
+                        onClick={() => updateWallet(user._id, 100, 'add')}
+                        className="text-green-600 hover:text-green-900"
+                      >
+                        إضافة $100
+                      </button>
+                      <button
+                        onClick={() => updateWallet(user._id, 100, 'subtract')}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        خصم $100
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
