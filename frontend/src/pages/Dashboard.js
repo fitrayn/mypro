@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import axios from 'axios';
+import api from '../utils/api';
 import toast from 'react-hot-toast';
 import {
   CurrencyDollarIcon,
@@ -27,14 +27,18 @@ const Dashboard = () => {
   const fetchData = async () => {
     try {
       const [statsResponse, offersResponse] = await Promise.all([
-        axios.get('/api/orders/stats/summary'),
-        axios.get('/api/offers')
+        api.get('/api/orders/stats/summary'),
+        api.get('/api/offers')
       ]);
       
-      setStats(statsResponse.data.summary);
-      setOffers(offersResponse.data.offers);
+      setStats(statsResponse.data.summary || {});
+      setOffers(offersResponse.data.offers || []);
     } catch (error) {
+      console.error('Dashboard fetch error:', error);
       toast.error('Failed to fetch dashboard data');
+      // Set default values to prevent undefined errors
+      setStats({});
+      setOffers([]);
     } finally {
       setLoading(false);
     }
@@ -48,7 +52,7 @@ const Dashboard = () => {
 
     setPlacingOrder(true);
     try {
-      await axios.post('/api/orders/bundle', {
+      await api.post('/api/orders/bundle', {
         offerId: selectedOffer._id,
         targetUrl
       });
@@ -148,49 +152,57 @@ const Dashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {offers.map((offer) => (
-            <div
-              key={offer._id}
-              className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                selectedOffer?._id === offer._id
-                  ? 'border-primary-500 bg-primary-50'
-                  : 'border-gray-200 hover:border-primary-300'
-              }`}
-              onClick={() => setSelectedOffer(offer)}
-            >
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="font-semibold text-gray-900">{offer.title}</h3>
-                <span className="text-lg font-bold text-primary-600">
-                  ${offer.price}
-                </span>
+          {offers && offers.length > 0 ? (
+            offers.map((offer) => (
+              <div
+                key={offer._id}
+                className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                  selectedOffer?._id === offer._id
+                    ? 'border-primary-500 bg-primary-50'
+                    : 'border-gray-200 hover:border-primary-300'
+                }`}
+                onClick={() => setSelectedOffer(offer)}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-semibold text-gray-900">{offer.title}</h3>
+                  <span className="text-lg font-bold text-primary-600">
+                    ${offer.price}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-600 mb-3">{offer.description}</p>
+                <div className="space-y-1 text-sm">
+                  {offer.likes > 0 && (
+                    <div className="flex items-center">
+                      <HeartIcon className="h-4 w-4 text-red-500 mr-2" />
+                      <span>{offer.likes} Likes</span>
+                    </div>
+                  )}
+                  {offer.comments > 0 && (
+                    <div className="flex items-center">
+                      <ChatBubbleLeftRightIcon className="h-4 w-4 text-blue-500 mr-2" />
+                      <span>{offer.comments} Comments</span>
+                    </div>
+                  )}
+                  {offer.follows > 0 && (
+                    <div className="flex items-center">
+                      <UserPlusIcon className="h-4 w-4 text-green-500 mr-2" />
+                      <span>{offer.follows} Follows</span>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-3 text-xs text-gray-500 flex items-center">
+                  <ClockIcon className="h-3 w-3 mr-1" />
+                  {offer.deliveryTime}
+                </div>
               </div>
-              <p className="text-sm text-gray-600 mb-3">{offer.description}</p>
-              <div className="space-y-1 text-sm">
-                {offer.likes > 0 && (
-                  <div className="flex items-center">
-                    <HeartIcon className="h-4 w-4 text-red-500 mr-2" />
-                    <span>{offer.likes} Likes</span>
-                  </div>
-                )}
-                {offer.comments > 0 && (
-                  <div className="flex items-center">
-                    <ChatBubbleLeftRightIcon className="h-4 w-4 text-blue-500 mr-2" />
-                    <span>{offer.comments} Comments</span>
-                  </div>
-                )}
-                {offer.follows > 0 && (
-                  <div className="flex items-center">
-                    <UserPlusIcon className="h-4 w-4 text-green-500 mr-2" />
-                    <span>{offer.follows} Follows</span>
-                  </div>
-                )}
-              </div>
-              <div className="mt-3 text-xs text-gray-500 flex items-center">
-                <ClockIcon className="h-3 w-3 mr-1" />
-                {offer.deliveryTime}
-              </div>
+            ))
+          ) : (
+            <div className="col-span-full text-center py-8">
+              <ShoppingCartIcon className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+              <p className="text-gray-500">No offers available</p>
+              <p className="text-sm text-gray-400">Please check back later</p>
             </div>
-          ))}
+          )}
         </div>
 
         {selectedOffer && (
