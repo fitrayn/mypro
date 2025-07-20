@@ -13,7 +13,7 @@ import {
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState({});
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOffer, setSelectedOffer] = useState(null);
@@ -31,8 +31,12 @@ const Dashboard = () => {
         api.get('/api/offers')
       ]);
       
-      setStats(statsResponse.data.summary || {});
-      setOffers(offersResponse.data.offers || []);
+      // Ensure we have valid data
+      const statsData = statsResponse.data?.summary || {};
+      const offersData = Array.isArray(offersResponse.data?.offers) ? offersResponse.data.offers : [];
+      
+      setStats(statsData);
+      setOffers(offersData);
     } catch (error) {
       console.error('Dashboard fetch error:', error);
       toast.error('Failed to fetch dashboard data');
@@ -152,7 +156,7 @@ const Dashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {offers && offers.length > 0 ? (
+          {Array.isArray(offers) && offers.length > 0 ? (
             offers.map((offer) => (
               <div
                 key={offer._id}
