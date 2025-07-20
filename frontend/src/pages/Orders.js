@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 import api from '../utils/api';
 import {
@@ -24,7 +24,7 @@ const Orders = () => {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [updateRunningOrders]);
 
   const fetchOrders = async () => {
     try {
@@ -38,7 +38,7 @@ const Orders = () => {
     }
   };
 
-  const updateRunningOrders = async () => {
+  const updateRunningOrders = useCallback(async () => {
     try {
       const runningOrders = orders.filter(order => order.status === 'running');
       
@@ -51,9 +51,9 @@ const Orders = () => {
     } catch (error) {
       console.error('Update running orders error:', error);
     }
-  };
+  }, [orders]);
 
-  const fetchOrderStatus = async (orderId) => {
+  const fetchOrderStatus = useCallback(async (orderId) => {
     try {
       const response = await api.get(`/api/orders/${orderId}/status`);
       return response.data.order;
@@ -61,17 +61,17 @@ const Orders = () => {
       console.error('Fetch order status error:', error);
       return null;
     }
-  };
+  }, []);
 
-  const updateOrderInList = (orderId, updatedData) => {
+  const updateOrderInList = useCallback((orderId, updatedData) => {
     setOrders(prevOrders => 
       prevOrders.map(order => 
         order._id === orderId ? { ...order, ...updatedData } : order
       )
     );
-  };
+  }, []);
 
-  const handleOrderClick = async (order) => {
+  const handleOrderClick = useCallback(async (order) => {
     setSelectedOrder(order);
     setShowDetails(true);
     
@@ -83,7 +83,7 @@ const Orders = () => {
         setSelectedOrder({ ...order, ...statusData });
       }
     }
-  };
+  }, [fetchOrderStatus, updateOrderInList]);
 
   const getStatusIcon = (status) => {
     switch (status) {

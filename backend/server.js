@@ -14,6 +14,7 @@ const cookieRoutes = require('./routes/cookies');
 const proxyRoutes = require('./routes/proxies');
 const offerRoutes = require('./routes/offers');
 const automationRoutes = require('./routes/automation');
+const automationService = require('./services/automationService');
 
 const logger = require('./utils/logger');
 
@@ -107,6 +108,9 @@ app.use('*', (req, res) => {
 
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
+  
+  // تشغيل التطبيق التلقائي تلقائياً
+  automationService.autoStart();
 });
 
 module.exports = app; 

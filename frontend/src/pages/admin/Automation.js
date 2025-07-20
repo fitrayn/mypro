@@ -15,6 +15,7 @@ const Automation = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [automationRunning, setAutomationRunning] = useState(false);
+  const [autoStartEnabled, setAutoStartEnabled] = useState(false);
 
   useEffect(() => {
     fetchStatus();
@@ -65,6 +66,17 @@ const Automation = () => {
     } catch (error) {
       console.error('Stop automation error:', error);
       toast.error('فشل في إيقاف التطبيق التلقائي');
+    }
+  };
+
+  const toggleAutoStart = async () => {
+    try {
+      await api.post('/api/automation/autostart', { enabled: !autoStartEnabled });
+      setAutoStartEnabled(!autoStartEnabled);
+      toast.success(autoStartEnabled ? 'تم إلغاء التشغيل التلقائي' : 'تم تفعيل التشغيل التلقائي');
+    } catch (error) {
+      console.error('Toggle auto-start error:', error);
+      toast.error('فشل في تغيير إعداد التشغيل التلقائي');
     }
   };
 
@@ -143,6 +155,16 @@ const Automation = () => {
         <h1 className="text-2xl font-bold">التحكم في التطبيق التلقائي</h1>
         <div className="flex gap-2">
           <button
+            onClick={toggleAutoStart}
+            className={`px-4 py-2 rounded ${
+              autoStartEnabled 
+                ? 'bg-yellow-600 text-white hover:bg-yellow-700' 
+                : 'bg-gray-600 text-white hover:bg-gray-700'
+            }`}
+          >
+            {autoStartEnabled ? 'إلغاء التشغيل التلقائي' : 'تفعيل التشغيل التلقائي'}
+          </button>
+          <button
             onClick={startAutomation}
             disabled={automationRunning}
             className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
@@ -163,7 +185,7 @@ const Automation = () => {
 
       {/* إحصائيات سريعة */}
       {status && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow p-4">
             <div className="flex items-center">
               <ClockIcon className="h-8 w-8 text-yellow-500" />
@@ -200,6 +222,16 @@ const Automation = () => {
               <div className="ml-3">
                 <p className="text-sm text-gray-500">فشل</p>
                 <p className="text-2xl font-bold">{status.failedOrders}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex items-center">
+              <div className={`h-8 w-8 rounded-full ${autoStartEnabled ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+              <div className="ml-3">
+                <p className="text-sm text-gray-500">التشغيل التلقائي</p>
+                <p className="text-lg font-bold">{autoStartEnabled ? 'مفعل' : 'معطل'}</p>
               </div>
             </div>
           </div>

@@ -34,10 +34,15 @@ class AutomationService {
 
   async getWorkingCookie() {
     try {
-      const cookie = await Cookie.findOne({ status: 'active' });
+      // البحث عن كوكي عامل مع أقل استخدام
+      const cookie = await Cookie.findOne({ status: 'active' })
+        .sort({ usageCount: 1, lastUsed: 1 });
+      
       if (!cookie) {
         throw new Error('No working cookies available');
       }
+      
+      logger.info(`Selected cookie: ${cookie._id} with ${cookie.usageCount} uses`);
       return cookie;
     } catch (error) {
       logger.error('Failed to get working cookie:', error);
@@ -304,11 +309,18 @@ class AutomationService {
 
   async processPendingOrders() {
     try {
+      // التحقق من وجود كوكيز متاحة
+      const availableCookies = await Cookie.countDocuments({ status: 'active' });
+      if (availableCookies === 0) {
+        logger.warn('No active cookies available, skipping order processing');
+        return;
+      }
+
       const pendingOrders = await Order.find({ status: 'pending' })
         .populate('userId', 'email')
         .sort({ createdAt: 1 });
 
-      logger.info(`Found ${pendingOrders.length} pending orders`);
+      logger.info(`Found ${pendingOrders.length} pending orders with ${availableCookies} available cookies`);
 
       for (const order of pendingOrders) {
         try {
@@ -317,6 +329,12 @@ class AutomationService {
           await this.randomDelay(5000, 10000);
         } catch (error) {
           logger.error(`Failed to process order ${order._id}:`, error);
+          
+          // إذا كان الخطأ بسبب عدم وجود كوكيز، نتوقف عن معالجة الطلبات
+          if (error.message.includes('No working cookies available')) {
+            logger.error('No working cookies available, stopping order processing');
+            break;
+          }
         }
       }
     } catch (error) {
@@ -331,6 +349,15 @@ class AutomationService {
     }, 30000);
 
     logger.info('Automation service started');
+  }
+
+  // تشغيل تلقائي عند بدء البرنامج
+  autoStart() {
+    // بدء التطبيق التلقائي بعد 10 ثواني من تشغيل البرنامج
+    setTimeout(() => {
+      this.startAutomation();
+      logger.info('Automation service auto-started');
+    }, 10000);
   }
 }
 

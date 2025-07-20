@@ -17,6 +17,26 @@ router.post('/start', adminAuth, async (req, res) => {
   }
 });
 
+// Enable/Disable auto-start
+router.post('/autostart', adminAuth, async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    
+    // حفظ إعداد التشغيل التلقائي في متغير بيئي أو قاعدة البيانات
+    process.env.AUTO_START_AUTOMATION = enabled ? 'true' : 'false';
+    
+    if (enabled) {
+      automationService.autoStart();
+      res.json({ message: 'Auto-start enabled successfully' });
+    } else {
+      res.json({ message: 'Auto-start disabled successfully' });
+    }
+  } catch (error) {
+    logger.error('Auto-start toggle error:', error);
+    res.status(500).json({ error: 'Failed to toggle auto-start' });
+  }
+});
+
 // Stop automation service
 router.post('/stop', adminAuth, async (req, res) => {
   try {
