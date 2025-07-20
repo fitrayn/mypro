@@ -15,7 +15,7 @@ services:
       - key: JWT_SECRET
         sync: false
       - key: FRONTEND_URL
-        value: https://facebook-automation-frontend.onrender.com
+        value: https://faceautomation.netlify.app
     healthCheckPath: /api/health
     autoDeploy: true
 
@@ -27,5 +27,5 @@ services:
     staticPublishPath: frontend/build
     envVars:
       - key: REACT_APP_API_URL
-        value: https://facebook-automation-backend.onrender.com
+        value: https://mypro-kwda.onrender.com
     autoDeploy: true 
