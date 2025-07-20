@@ -15,17 +15,6 @@ const Orders = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
 
-  useEffect(() => {
-    fetchOrders();
-    
-    // تحديث تلقائي كل 5 ثواني للطلبات قيد التنفيذ
-    const interval = setInterval(() => {
-      updateRunningOrders();
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [updateRunningOrders]);
-
   const fetchOrders = async () => {
     try {
       const response = await api.get('/api/orders');
@@ -37,21 +26,6 @@ const Orders = () => {
       setLoading(false);
     }
   };
-
-  const updateRunningOrders = useCallback(async () => {
-    try {
-      const runningOrders = orders.filter(order => order.status === 'running');
-      
-      for (const order of runningOrders) {
-        const statusData = await fetchOrderStatus(order._id);
-        if (statusData) {
-          updateOrderInList(order._id, statusData);
-        }
-      }
-    } catch (error) {
-      console.error('Update running orders error:', error);
-    }
-  }, [orders]);
 
   const fetchOrderStatus = useCallback(async (orderId) => {
     try {
@@ -71,6 +45,21 @@ const Orders = () => {
     );
   }, []);
 
+  const updateRunningOrders = useCallback(async () => {
+    try {
+      const runningOrders = orders.filter(order => order.status === 'running');
+      
+      for (const order of runningOrders) {
+        const statusData = await fetchOrderStatus(order._id);
+        if (statusData) {
+          updateOrderInList(order._id, statusData);
+        }
+      }
+    } catch (error) {
+      console.error('Update running orders error:', error);
+    }
+  }, [orders, fetchOrderStatus, updateOrderInList]);
+
   const handleOrderClick = useCallback(async (order) => {
     setSelectedOrder(order);
     setShowDetails(true);
@@ -84,6 +73,17 @@ const Orders = () => {
       }
     }
   }, [fetchOrderStatus, updateOrderInList]);
+
+  useEffect(() => {
+    fetchOrders();
+    
+    // تحديث تلقائي كل 5 ثواني للطلبات قيد التنفيذ
+    const interval = setInterval(() => {
+      updateRunningOrders();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [updateRunningOrders]);
 
   const getStatusIcon = (status) => {
     switch (status) {
