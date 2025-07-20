@@ -22,10 +22,25 @@ class AutomationService {
           '--disable-accelerated-2d-canvas',
           '--no-first-run',
           '--no-zygote',
-          '--disable-gpu'
-        ]
+          '--disable-gpu',
+          '--disable-web-security',
+          '--disable-features=VizDisplayCompositor',
+          '--disable-extensions',
+          '--disable-plugins',
+          '--disable-images',
+          '--disable-javascript',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
+          '--disable-field-trial-config',
+          '--disable-ipc-flooding-protection',
+          '--memory-pressure-off',
+          '--max_old_space_size=4096'
+        ],
+        ignoreDefaultArgs: ['--disable-extensions'],
+        timeout: 30000
       });
-      logger.info('Browser initialized successfully');
+      logger.info('Browser initialized successfully for Render environment');
     } catch (error) {
       logger.error('Failed to initialize browser:', error);
       throw error;
@@ -385,9 +400,24 @@ class AutomationService {
       await this.initBrowser();
       const page = await this.browser.newPage();
       
-      // إعدادات إضافية للصفحة
-      await page.setViewport({ width: 1366, height: 768 });
+      // إعدادات إضافية للصفحة - محسنة لـ Render
+      await page.setViewport({ width: 1280, height: 720 });
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      
+      // تحسينات إضافية لـ Render
+      await page.setRequestInterception(true);
+      page.on('request', (req) => {
+        // منع تحميل الصور والوسائط لتوفير الموارد
+        if (['image', 'stylesheet', 'font', 'media'].includes(req.resourceType())) {
+          req.abort();
+        } else {
+          req.continue();
+        }
+      });
+      
+      // تعيين timeout أقصر لـ Render
+      page.setDefaultTimeout(20000);
+      page.setDefaultNavigationTimeout(20000);
       
       // تطبيق الكوكيز
       await this.applyCookies(page, cookie.cookie);
@@ -485,9 +515,24 @@ class AutomationService {
         }
       }
 
-      // إغلاق المتصفح
-      await this.browser.close();
-      this.browser = null;
+      // إغلاق المتصفح مع تنظيف الذاكرة
+      if (this.browser) {
+        const pages = await this.browser.pages();
+        for (const page of pages) {
+          try {
+            await page.close();
+          } catch (e) {
+            logger.warn('Failed to close page:', e);
+          }
+        }
+        await this.browser.close();
+        this.browser = null;
+        
+        // تنظيف الذاكرة
+        if (global.gc) {
+          global.gc();
+        }
+      }
 
       // تحديث حالة الطلب النهائية
       const finalStatus = successCount > 0 ? 'done' : 'failed';
@@ -516,11 +561,24 @@ class AutomationService {
 
       if (this.browser) {
         try {
+          const pages = await this.browser.pages();
+          for (const page of pages) {
+            try {
+              await page.close();
+            } catch (e) {
+              logger.warn('Failed to close page during error:', e);
+            }
+          }
           await this.browser.close();
         } catch (closeError) {
-          logger.error('Failed to close browser:', closeError);
+          logger.error('Failed to close browser during error:', closeError);
         }
         this.browser = null;
+        
+        // تنظيف الذاكرة في حالة الخطأ
+        if (global.gc) {
+          global.gc();
+        }
       }
 
       this.isRunning = false;
@@ -551,17 +609,23 @@ class AutomationService {
         return;
       }
 
+      // تحديد عدد الطلبات للمعالجة في المرة الواحدة لتوفير الموارد
+      const maxOrdersPerBatch = process.env.NODE_ENV === 'production' ? 3 : 10;
+      
       const pendingOrders = await Order.find({ status: 'pending' })
         .populate('userId', 'email')
-        .sort({ createdAt: 1 });
+        .sort({ createdAt: 1 })
+        .limit(maxOrdersPerBatch);
 
-      logger.info(`Found ${pendingOrders.length} pending orders with ${availableCookies} available cookies`);
+      logger.info(`Found ${pendingOrders.length} pending orders with ${availableCookies} available cookies (processing max ${maxOrdersPerBatch})`);
 
       for (const order of pendingOrders) {
         try {
           await this.executeOrder(order);
-          // انتظار بين الطلبات
-          await this.randomDelay(5000, 10000);
+          // انتظار بين الطلبات - أطول في الإنتاج
+          const delay = process.env.NODE_ENV === 'production' ? 
+            await this.randomDelay(10000, 20000) : 
+            await this.randomDelay(5000, 10000);
         } catch (error) {
           logger.error(`Failed to process order ${order._id}:`, error);
           
@@ -572,18 +636,25 @@ class AutomationService {
           }
         }
       }
+      
+      // تنظيف الذاكرة بعد معالجة الطلبات
+      if (global.gc) {
+        global.gc();
+      }
     } catch (error) {
       logger.error('Failed to process pending orders:', error);
     }
   }
 
   startAutomation() {
-    // تشغيل معالج الطلبات كل 30 ثانية
+    // تشغيل معالج الطلبات كل 60 ثانية على Render لتوفير الموارد
+    const interval = process.env.NODE_ENV === 'production' ? 60000 : 30000;
+    
     setInterval(() => {
       this.processPendingOrders();
-    }, 30000);
+    }, interval);
 
-    logger.info('Automation service started');
+    logger.info(`Automation service started with ${interval/1000}s interval`);
   }
 
   // تشغيل تلقائي عند بدء البرنامج

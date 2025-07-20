@@ -4,7 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 require('dotenv').config();
 
-const { authLimiter, apiLimiter, securityConfig } = require('./middleware/security');
+const { authLimiter, apiLimiter, securityConfig } = require('./middlewares/security');
 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
