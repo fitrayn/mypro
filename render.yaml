@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: facebook-automation-backend
+    env: node
+    plan: free
+    buildCommand: npm install && cd frontend && npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        value: https://facebook-automation-frontend.onrender.com
+    healthCheckPath: /api/health
+    autoDeploy: true
+
+  - type: web
+    name: facebook-automation-frontend
+    env: static
+    plan: free
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/build
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://facebook-automation-backend.onrender.com
+    autoDeploy: true 
