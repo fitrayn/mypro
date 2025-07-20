@@ -109,8 +109,8 @@ app.use('*', (req, res) => {
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
   
-  // تشغيل التطبيق التلقائي تلقائياً
-  automationService.autoStart();
+  // تشغيل التطبيق التلقائي تلقائياً - معلق مؤقتاً
+  // automationService.autoStart();
 });
 
 module.exports = app; 
