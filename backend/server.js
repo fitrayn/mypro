@@ -80,7 +80,13 @@ app.use('/api/offers', offerRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    jwtSecret: process.env.JWT_SECRET ? 'set' : 'not set'
+  });
 });
 
 // Error handling middleware

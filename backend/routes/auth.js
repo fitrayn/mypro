@@ -14,14 +14,17 @@ router.post('/register', [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      logger.warn('Registration validation errors:', errors.array());
       return res.status(400).json({ errors: errors.array() });
     }
 
     const { email, password } = req.body;
+    logger.info(`Registration attempt for email: ${email}`);
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      logger.warn(`Registration failed - user already exists: ${email}`);
       return res.status(400).json({ error: 'User already exists with this email.' });
     }
 
@@ -32,15 +35,23 @@ router.post('/register', [
     });
 
     await user.save();
+    logger.info(`User saved to database: ${email}`);
+
+    // Check if JWT_SECRET is set
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      logger.error('JWT_SECRET is not set in environment variables');
+      return res.status(500).json({ error: 'Server configuration error.' });
+    }
 
     // Generate JWT token
     const token = jwt.sign(
       { userId: user._id },
-      process.env.JWT_SECRET || 'your-secret-key',
+      jwtSecret,
       { expiresIn: '7d' }
     );
 
-    logger.info(`New user registered: ${email}`);
+    logger.info(`New user registered successfully: ${email}`);
 
     res.status(201).json({
       message: 'User registered successfully',
@@ -54,7 +65,10 @@ router.post('/register', [
     });
   } catch (error) {
     logger.error('Registration error:', error);
-    res.status(500).json({ error: 'Registration failed.' });
+    res.status(500).json({ 
+      error: 'Registration failed.',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
@@ -66,30 +80,41 @@ router.post('/login', [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      logger.warn('Login validation errors:', errors.array());
       return res.status(400).json({ errors: errors.array() });
     }
 
     const { email, password } = req.body;
+    logger.info(`Login attempt for email: ${email}`);
 
     // Find user
     const user = await User.findOne({ email });
     if (!user) {
+      logger.warn(`Login failed - user not found: ${email}`);
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
     // Check password
     if (!user.checkPassword(password)) {
+      logger.warn(`Login failed - invalid password for: ${email}`);
       return res.status(401).json({ error: 'Invalid credentials.' });
+    }
+
+    // Check if JWT_SECRET is set
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      logger.error('JWT_SECRET is not set in environment variables');
+      return res.status(500).json({ error: 'Server configuration error.' });
     }
 
     // Generate JWT token
     const token = jwt.sign(
       { userId: user._id },
-      process.env.JWT_SECRET || 'your-secret-key',
+      jwtSecret,
       { expiresIn: '7d' }
     );
 
-    logger.info(`User logged in: ${email}`);
+    logger.info(`User logged in successfully: ${email}`);
 
     res.json({
       message: 'Login successful',
@@ -103,7 +128,10 @@ router.post('/login', [
     });
   } catch (error) {
     logger.error('Login error:', error);
-    res.status(500).json({ error: 'Login failed.' });
+    res.status(500).json({ 
+      error: 'Login failed.',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
