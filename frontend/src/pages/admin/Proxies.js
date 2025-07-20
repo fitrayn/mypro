@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import axios from 'axios';
+import api from '../../utils/api';
 
 const Proxies = () => {
   const [proxies, setProxies] = useState([]);
@@ -19,14 +19,14 @@ const Proxies = () => {
 
   const fetchProxies = async () => {
     try {
-      const response = await axios.get('/api/proxies', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      setProxies(response.data);
+      const response = await api.get('/api/proxies');
+      // Ensure we have valid data
+      const proxiesData = Array.isArray(response.data?.proxies) ? response.data.proxies : [];
+      setProxies(proxiesData);
     } catch (error) {
+      console.error('Fetch proxies error:', error);
       toast.error('فشل في تحميل البروكسيات');
+      setProxies([]);
     } finally {
       setLoading(false);
     }
@@ -39,32 +39,23 @@ const Proxies = () => {
     }
 
     try {
-      await axios.post('/api/proxies', 
-        newProxy,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`
-          }
-        }
-      );
+      await api.post('/api/proxies', newProxy);
       toast.success('تم إضافة البروكسي بنجاح');
       setNewProxy({ ip: '', port: '', username: '', password: '', country: '' });
       fetchProxies();
     } catch (error) {
+      console.error('Add proxy error:', error);
       toast.error('فشل في إضافة البروكسي');
     }
   };
 
   const testProxy = async (proxyId) => {
     try {
-      await axios.post(`/api/proxies/${proxyId}/test`, {}, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      await api.post(`/api/proxies/${proxyId}/test`, {});
       toast.success('تم اختبار البروكسي بنجاح');
       fetchProxies();
     } catch (error) {
+      console.error('Test proxy error:', error);
       toast.error('فشل في اختبار البروكسي');
     }
   };
@@ -165,36 +156,44 @@ const Proxies = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {proxies.map((proxy) => (
-              <tr key={proxy._id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {proxy.ip}:{proxy.port}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {proxy.country || 'غير محدد'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(proxy.status)}`}>
-                    {proxy.status === 'working' && 'يعمل'}
-                    {proxy.status === 'dead' && 'غير صالح'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {proxy.responseTime ? `${proxy.responseTime}ms` : 'غير محدد'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {proxy.lastTested ? new Date(proxy.lastTested).toLocaleDateString('ar-SA') : 'لم يتم الاختبار'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button
-                    onClick={() => testProxy(proxy._id)}
-                    className="text-blue-600 hover:text-blue-900"
-                  >
-                    اختبار
-                  </button>
+            {Array.isArray(proxies) && proxies.length > 0 ? (
+              proxies.map((proxy) => (
+                <tr key={proxy._id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {proxy.ip}:{proxy.port}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {proxy.country || 'غير محدد'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(proxy.status)}`}>
+                      {proxy.status === 'working' && 'يعمل'}
+                      {proxy.status === 'dead' && 'غير صالح'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {proxy.responseTime ? `${proxy.responseTime}ms` : 'غير محدد'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {proxy.lastTested ? new Date(proxy.lastTested).toLocaleDateString('ar-SA') : 'لم يتم الاختبار'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button
+                      onClick={() => testProxy(proxy._id)}
+                      className="text-blue-600 hover:text-blue-900"
+                    >
+                      اختبار
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                  لا توجد بروكسيات
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>

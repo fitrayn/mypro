@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import axios from 'axios';
+import api from '../utils/api';
 import toast from 'react-hot-toast';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
@@ -28,10 +28,11 @@ const Profile = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await axios.get('/api/user/stats');
-      setStats(response.data.stats);
+      const response = await api.get('/api/user/stats');
+      setStats(response.data?.stats || null);
     } catch (error) {
       console.error('Failed to fetch stats:', error);
+      setStats(null);
     }
   };
 
@@ -40,10 +41,11 @@ const Profile = () => {
     setLoading(true);
     
     try {
-      const response = await axios.patch('/api/user/profile', profile);
+      const response = await api.patch('/api/user/profile', profile);
       updateUser(response.data.user);
       toast.success('Profile updated successfully');
     } catch (error) {
+      console.error('Profile update error:', error);
       const message = error.response?.data?.error || 'Failed to update profile';
       toast.error(message);
     } finally {
@@ -66,7 +68,7 @@ const Profile = () => {
 
     setLoading(true);
     try {
-      await axios.patch('/api/user/password', {
+      await api.patch('/api/user/password', {
         currentPassword: password.currentPassword,
         newPassword: password.newPassword
       });
@@ -78,6 +80,7 @@ const Profile = () => {
       });
       toast.success('Password changed successfully');
     } catch (error) {
+      console.error('Password change error:', error);
       const message = error.response?.data?.error || 'Failed to change password';
       toast.error(message);
     } finally {
