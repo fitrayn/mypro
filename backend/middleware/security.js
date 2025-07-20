@@ -8,6 +8,8 @@ const authLimiter = rateLimit({
   message: 'Too many login attempts, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  // Trust proxy for Render deployment
+  trustProxy: true,
 });
 
 const apiLimiter = rateLimit({
@@ -16,6 +18,8 @@ const apiLimiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  // Trust proxy for Render deployment
+  trustProxy: true,
 });
 
 // Security headers configuration
