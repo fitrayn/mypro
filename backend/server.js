@@ -13,6 +13,7 @@ const orderRoutes = require('./routes/orders');
 const cookieRoutes = require('./routes/cookies');
 const proxyRoutes = require('./routes/proxies');
 const offerRoutes = require('./routes/offers');
+const automationRoutes = require('./routes/automation');
 
 const logger = require('./utils/logger');
 
@@ -33,7 +34,7 @@ const corsOptions = {
       'https://faceautomation.netlify.app',
       'https://faceautomation.netlify.app/'
     ];
-    
+
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
@@ -77,6 +78,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/cookies', cookieRoutes);
 app.use('/api/proxies', proxyRoutes);
 app.use('/api/offers', offerRoutes);
+app.use('/api/automation', automationRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
