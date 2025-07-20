@@ -5,7 +5,6 @@ import {
   HomeIcon,
   ShoppingCartIcon,
   UserIcon,
-  CogIcon,
   UsersIcon,
   CubeIcon,
   ServerIcon,

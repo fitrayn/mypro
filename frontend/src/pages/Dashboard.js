@@ -48,7 +48,7 @@ const Dashboard = () => {
 
     setPlacingOrder(true);
     try {
-      const response = await axios.post('/api/orders/bundle', {
+      await axios.post('/api/orders/bundle', {
         offerId: selectedOffer._id,
         targetUrl
       });
