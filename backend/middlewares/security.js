@@ -1,4 +1,5 @@
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = require('express-rate-limit');
 const helmet = require('helmet');
 
 // Rate limiting for different endpoints
@@ -10,10 +11,8 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   // Trust proxy for Render deployment
   trustProxy: true,
-  // Custom key generator to handle proxy issues
-  keyGenerator: (req) => {
-    return req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket?.remoteAddress;
-  },
+  // Use ipKeyGenerator for IPv6 compatibility
+  keyGenerator: ipKeyGenerator,
 });
 
 const apiLimiter = rateLimit({
@@ -24,10 +23,8 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
   // Trust proxy for Render deployment
   trustProxy: true,
-  // Custom key generator to handle proxy issues
-  keyGenerator: (req) => {
-    return req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket?.remoteAddress;
-  },
+  // Use ipKeyGenerator for IPv6 compatibility
+  keyGenerator: ipKeyGenerator,
 });
 
 // Security headers configuration
