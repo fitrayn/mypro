@@ -88,7 +88,7 @@ router.post('/', [
 // Bulk upload proxies
 router.post('/bulk', [
   adminAuth,
-  body('proxies').isArray({ min: 1 }),
+  body('proxies').isArray({ min: 1, max: 10000 }),
   body('proxies.*.ip').isIP(),
   body('proxies.*.port').isPort(),
   body('proxies.*.username').optional(),
@@ -105,38 +105,129 @@ router.post('/bulk', [
     const { proxies } = req.body;
     const results = { added: 0, skipped: 0, errors: [] };
 
+    // Validate all proxies first
+    const validProxies = [];
+    const invalidProxies = [];
+
     for (const proxyData of proxies) {
       try {
-        const existingProxy = await Proxy.findOne({ 
-          ip: proxyData.ip, 
-          port: proxyData.port 
-        });
-        if (existingProxy) {
-          results.skipped++;
+        // Basic validation
+        if (!proxyData.ip || !proxyData.port) {
+          invalidProxies.push({
+            ip: proxyData.ip || 'unknown',
+            port: proxyData.port || 'unknown',
+            error: 'Missing IP or Port'
+          });
           continue;
         }
 
-        const newProxy = new Proxy({
+        // IP validation
+        const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+        if (!ipRegex.test(proxyData.ip)) {
+          invalidProxies.push({
+            ip: proxyData.ip,
+            port: proxyData.port,
+            error: 'Invalid IP format'
+          });
+          continue;
+        }
+
+        // Port validation
+        const port = parseInt(proxyData.port);
+        if (isNaN(port) || port < 1 || port > 65535) {
+          invalidProxies.push({
+            ip: proxyData.ip,
+            port: proxyData.port,
+            error: 'Invalid port number'
+          });
+          continue;
+        }
+
+        validProxies.push({
           ip: proxyData.ip,
-          port: proxyData.port,
+          port: proxyData.port.toString(),
           username: proxyData.username || '',
           password: proxyData.password || '',
           country: proxyData.country || '',
           notes: proxyData.notes || ''
         });
-
-        await newProxy.save();
-        results.added++;
       } catch (error) {
-        results.errors.push({ 
-          ip: proxyData.ip, 
-          port: proxyData.port, 
-          error: error.message 
+        invalidProxies.push({
+          ip: proxyData.ip || 'unknown',
+          port: proxyData.port || 'unknown',
+          error: error.message
         });
       }
     }
 
-    logger.info(`Bulk proxy upload: ${results.added} added, ${results.skipped} skipped`);
+    // Check for duplicates in the input
+    const uniqueProxies = [];
+    const duplicateProxies = [];
+
+    for (const proxy of validProxies) {
+      const key = `${proxy.ip}:${proxy.port}`;
+      const existing = uniqueProxies.find(p => `${p.ip}:${p.port}` === key);
+      
+      if (existing) {
+        duplicateProxies.push(proxy);
+      } else {
+        uniqueProxies.push(proxy);
+      }
+    }
+
+    results.skipped += duplicateProxies.length;
+
+    // Check for existing proxies in database (batch operation for better performance)
+    if (uniqueProxies.length > 0) {
+      const existingProxies = await Proxy.find({
+        $or: uniqueProxies.map(proxy => ({
+          ip: proxy.ip,
+          port: proxy.port
+        }))
+      });
+
+      const existingKeys = new Set(existingProxies.map(p => `${p.ip}:${p.port}`));
+      const newProxies = uniqueProxies.filter(proxy => 
+        !existingKeys.has(`${proxy.ip}:${proxy.port}`)
+      );
+
+      results.skipped += (uniqueProxies.length - newProxies.length);
+
+      // Insert new proxies in batches
+      if (newProxies.length > 0) {
+        const batchSize = 500; // MongoDB recommended batch size
+        for (let i = 0; i < newProxies.length; i += batchSize) {
+          const batch = newProxies.slice(i, i + batchSize);
+          
+          try {
+            const proxyDocs = batch.map(proxyData => new Proxy(proxyData));
+            await Proxy.insertMany(proxyDocs, { ordered: false });
+            results.added += batch.length;
+          } catch (error) {
+            // Handle partial batch failures
+            if (error.writeErrors) {
+              results.added += (batch.length - error.writeErrors.length);
+              results.errors.push(...error.writeErrors.map(err => ({
+                ip: err.op.ip,
+                port: err.op.port,
+                error: err.err.errmsg || 'Insert failed'
+              })));
+            } else {
+              results.errors.push(...batch.map(proxy => ({
+                ip: proxy.ip,
+                port: proxy.port,
+                error: error.message
+              })));
+            }
+          }
+        }
+      }
+    }
+
+    // Add invalid proxies to errors
+    results.errors.push(...invalidProxies);
+
+    logger.info(`Bulk proxy upload: ${results.added} added, ${results.skipped} skipped, ${results.errors.length} errors`);
 
     res.json({
       message: 'Bulk upload completed',
