@@ -51,14 +51,80 @@ const Cookies = () => {
     }
 
     try {
-      const cookieList = bulkCookies.split('\n').filter(cookie => cookie.trim());
+      const cookieStrings = bulkCookies.split('\n').filter(cookie => cookie.trim());
+      const cookieList = cookieStrings.map(cookie => ({
+        cookie: cookie.trim(),
+        label: '',
+        notes: ''
+      }));
+      
       await api.post('/api/cookies/bulk', { cookies: cookieList });
       toast.success('تم إضافة الكوكيز بنجاح');
       setBulkCookies('');
       fetchCookies();
     } catch (error) {
       console.error('Add bulk cookies error:', error);
-      toast.error('فشل في إضافة الكوكيز');
+      const message = error.response?.data?.error || 'فشل في إضافة الكوكيز';
+      toast.error(message);
+    }
+  };
+
+  const cleanAndRemoveDuplicates = async () => {
+    if (!bulkCookies.trim()) {
+      toast.error('يرجى إدخال كوكيز أولاً');
+      return;
+    }
+
+    try {
+      // تنظيف الكوكيز وإزالة المتكرر
+      const cookieStrings = bulkCookies.split('\n')
+        .map(cookie => cookie.trim())
+        .filter(cookie => cookie.length > 0);
+      
+      // إزالة المتكرر
+      const uniqueCookies = [...new Set(cookieStrings)];
+      
+      // تحديث النص بالكوكيز المنظفة
+      setBulkCookies(uniqueCookies.join('\n'));
+      
+      const removedCount = cookieStrings.length - uniqueCookies.length;
+      toast.success(`تم تنظيف الكوكيز! تم إزالة ${removedCount} كوكي مكرر`);
+    } catch (error) {
+      console.error('Clean cookies error:', error);
+      toast.error('فشل في تنظيف الكوكيز');
+    }
+  };
+
+  const deleteCookie = async (cookieId) => {
+    try {
+      await api.delete(`/api/cookies/${cookieId}`);
+      toast.success('تم حذف الكوكي بنجاح');
+      fetchCookies();
+    } catch (error) {
+      console.error('Delete cookie error:', error);
+      const message = error.response?.data?.error || 'فشل في حذف الكوكي';
+      toast.error(message);
+    }
+  };
+
+  const deleteDeadCookies = async () => {
+    try {
+      const deadCookies = cookies.filter(cookie => cookie.status === 'dead');
+      if (deadCookies.length === 0) {
+        toast.info('لا توجد كوكيز ميتة للحذف');
+        return;
+      }
+
+      const deletePromises = deadCookies.map(cookie => 
+        api.delete(`/api/cookies/${cookie._id}`)
+      );
+      
+      await Promise.all(deletePromises);
+      toast.success(`تم حذف ${deadCookies.length} كوكي ميت بنجاح`);
+      fetchCookies();
+    } catch (error) {
+      console.error('Delete dead cookies error:', error);
+      toast.error('فشل في حذف الكوكيز الميتة');
     }
   };
 
@@ -81,7 +147,15 @@ const Cookies = () => {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">إدارة الكوكيز</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">إدارة الكوكيز</h1>
+        <button
+          onClick={deleteDeadCookies}
+          className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+        >
+          حذف الكوكيز الميتة
+        </button>
+      </div>
       
       {/* إضافة كوكي واحد */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
@@ -112,12 +186,20 @@ const Cookies = () => {
           placeholder="أدخل كوكيز Facebook (كل كوكي في سطر منفصل)"
           className="w-full border border-gray-300 rounded px-3 py-2 h-32"
         />
-        <button
-          onClick={addBulkCookies}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 mt-2"
-        >
-          إضافة الكوكيز
-        </button>
+        <div className="flex gap-2 mt-2">
+          <button
+            onClick={cleanAndRemoveDuplicates}
+            className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700"
+          >
+            تنظيف وإزالة المتكرر
+          </button>
+          <button
+            onClick={addBulkCookies}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+          >
+            إضافة الكوكيز
+          </button>
+        </div>
       </div>
 
       {/* جدول الكوكيز */}
@@ -136,6 +218,9 @@ const Cookies = () => {
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 آخر فحص
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                الإجراءات
               </th>
             </tr>
           </thead>
@@ -161,11 +246,19 @@ const Cookies = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {cookie.lastChecked ? new Date(cookie.lastChecked).toLocaleDateString('ar-SA') : 'لم يتم الفحص'}
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button
+                      onClick={() => deleteCookie(cookie._id)}
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      حذف
+                    </button>
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="4" className="px-6 py-4 text-center text-gray-500">
+                <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
                   لا توجد كوكيز
                 </td>
               </tr>
