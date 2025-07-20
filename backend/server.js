@@ -20,7 +20,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Trust proxy for Render deployment
-app.set('trust proxy', 1);
+app.set('trust proxy', true);
 
 // Security middleware
 app.use(helmet(securityConfig));
@@ -49,9 +49,9 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Rate limiting
-app.use('/api/auth', authLimiter);
-app.use('/api/', apiLimiter);
+// Rate limiting - temporarily disabled due to proxy issues
+// app.use('/api/auth', authLimiter);
+// app.use('/api/', apiLimiter);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

@@ -10,6 +10,10 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   // Trust proxy for Render deployment
   trustProxy: true,
+  // Custom key generator to handle proxy issues
+  keyGenerator: (req) => {
+    return req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket?.remoteAddress;
+  },
 });
 
 const apiLimiter = rateLimit({
@@ -20,6 +24,10 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
   // Trust proxy for Render deployment
   trustProxy: true,
+  // Custom key generator to handle proxy issues
+  keyGenerator: (req) => {
+    return req.ip || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket?.remoteAddress;
+  },
 });
 
 // Security headers configuration
