@@ -82,19 +82,67 @@ class AutomationService {
 
   async likePost(page, postUrl) {
     try {
-      await page.goto(postUrl, { waitUntil: 'networkidle2' });
+      await page.goto(postUrl, { waitUntil: 'networkidle2', timeout: 30000 });
       
-      // البحث عن زر الإعجاب
-      const likeButton = await page.$('[aria-label="Like"]') || 
-                        await page.$('[aria-label="أعجبني"]') ||
-                        await page.$('button[data-testid="like-button"]');
+      // انتظار إضافي للتأكد من تحميل الصفحة
+      await page.waitForTimeout(3000);
       
+      // محاولات متعددة للعثور على زر الإعجاب
+      const likeSelectors = [
+        '[aria-label="Like"]',
+        '[aria-label="أعجبني"]',
+        'button[data-testid="like-button"]',
+        '[data-testid="like-button"]',
+        'div[role="button"][tabindex="0"]',
+        'button[type="submit"]',
+        'div[aria-label*="Like"]',
+        'div[aria-label*="أعجبني"]'
+      ];
+
+      let likeButton = null;
+      
+      for (const selector of likeSelectors) {
+        try {
+          likeButton = await page.waitForSelector(selector, { timeout: 5000 });
+          if (likeButton) {
+            // التحقق من أن الزر قابل للنقر
+            const isVisible = await likeButton.isVisible();
+            if (isVisible) {
+              break;
+            }
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
       if (likeButton) {
+        // التمرير إلى الزر إذا كان خارج الشاشة
+        await likeButton.scrollIntoViewIfNeeded();
+        await page.waitForTimeout(1000);
+        
+        // النقر على الزر
         await likeButton.click();
-        logger.info('Post liked successfully');
-        return true;
+        
+        // انتظار للتأكد من نجاح العملية
+        await page.waitForTimeout(2000);
+        
+        // التحقق من تغيير حالة الزر
+        const isLiked = await page.evaluate(() => {
+          const likeButton = document.querySelector('[aria-label="Unlike"]') || 
+                           document.querySelector('[aria-label="إلغاء الإعجاب"]');
+          return !!likeButton;
+        });
+        
+        if (isLiked) {
+          logger.info('Post liked successfully');
+          return true;
+        } else {
+          logger.warn('Like action may not have been successful');
+          return false;
+        }
       } else {
-        logger.warn('Like button not found');
+        logger.warn('Like button not found with any selector');
         return false;
       }
     } catch (error) {
@@ -105,31 +153,117 @@ class AutomationService {
 
   async commentOnPost(page, postUrl, comment) {
     try {
-      await page.goto(postUrl, { waitUntil: 'networkidle2' });
+      await page.goto(postUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+      
+      // انتظار إضافي للتأكد من تحميل الصفحة
+      await page.waitForTimeout(3000);
       
       // البحث عن مربع التعليق
-      const commentBox = await page.$('[aria-label="Write a comment"]') ||
-                        await page.$('[aria-label="اكتب تعليقاً"]') ||
-                        await page.$('div[contenteditable="true"]');
+      const commentSelectors = [
+        '[aria-label="Write a comment"]',
+        '[aria-label="اكتب تعليقاً"]',
+        'div[contenteditable="true"]',
+        '[data-testid="comment-composer"]',
+        'div[role="textbox"]',
+        'textarea[placeholder*="comment"]',
+        'textarea[placeholder*="تعليق"]'
+      ];
+
+      let commentBox = null;
       
-      if (commentBox) {
-        await commentBox.click();
-        await page.keyboard.type(comment);
-        
-        // البحث عن زر الإرسال
-        const sendButton = await page.$('[aria-label="Post"]') ||
-                          await page.$('[aria-label="إرسال"]') ||
-                          await page.$('button[data-testid="comment-composer-post-button"]');
-        
-        if (sendButton) {
-          await sendButton.click();
-          logger.info('Comment posted successfully');
-          return true;
+      for (const selector of commentSelectors) {
+        try {
+          commentBox = await page.waitForSelector(selector, { timeout: 5000 });
+          if (commentBox) {
+            const isVisible = await commentBox.isVisible();
+            if (isVisible) {
+              break;
+            }
+          }
+        } catch (e) {
+          continue;
         }
       }
-      
-      logger.warn('Comment box or send button not found');
-      return false;
+
+      if (commentBox) {
+        // التمرير إلى مربع التعليق
+        await commentBox.scrollIntoViewIfNeeded();
+        await page.waitForTimeout(1000);
+        
+        // النقر على مربع التعليق
+        await commentBox.click();
+        await page.waitForTimeout(1000);
+        
+        // مسح أي نص موجود
+        await page.keyboard.down('Control');
+        await page.keyboard.press('A');
+        await page.keyboard.up('Control');
+        await page.keyboard.press('Backspace');
+        
+        // كتابة التعليق
+        await page.keyboard.type(comment);
+        await page.waitForTimeout(1000);
+        
+        // البحث عن زر الإرسال
+        const sendSelectors = [
+          '[aria-label="Post"]',
+          '[aria-label="إرسال"]',
+          'button[data-testid="comment-composer-post-button"]',
+          'button[type="submit"]',
+          'div[role="button"][tabindex="0"]',
+          'button:has-text("Post")',
+          'button:has-text("إرسال")'
+        ];
+
+        let sendButton = null;
+        
+        for (const selector of sendSelectors) {
+          try {
+            sendButton = await page.waitForSelector(selector, { timeout: 3000 });
+            if (sendButton) {
+              const isVisible = await sendButton.isVisible();
+              if (isVisible) {
+                break;
+              }
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+        
+        if (sendButton) {
+          // النقر على زر الإرسال
+          await sendButton.click();
+          
+          // انتظار للتأكد من إرسال التعليق
+          await page.waitForTimeout(3000);
+          
+          // التحقق من نجاح إرسال التعليق
+          const commentSent = await page.evaluate((commentText) => {
+            const comments = document.querySelectorAll('[data-testid="comment"]');
+            for (const commentElement of comments) {
+              if (commentElement.textContent.includes(commentText)) {
+                return true;
+              }
+            }
+            return false;
+          }, comment);
+          
+          if (commentSent) {
+            logger.info('Comment posted successfully');
+            return true;
+          } else {
+            logger.warn('Comment may not have been posted successfully');
+            return false;
+          }
+        } else {
+          logger.warn('Send button not found');
+          return false;
+        }
+      } else {
+        logger.warn('Comment box not found');
+        return false;
+      }
     } catch (error) {
       logger.error('Failed to comment on post:', error);
       return false;
@@ -138,17 +272,63 @@ class AutomationService {
 
   async followPage(page, pageUrl) {
     try {
-      await page.goto(pageUrl, { waitUntil: 'networkidle2' });
+      await page.goto(pageUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+      
+      // انتظار إضافي للتأكد من تحميل الصفحة
+      await page.waitForTimeout(3000);
       
       // البحث عن زر المتابعة
-      const followButton = await page.$('[aria-label="Follow"]') ||
-                          await page.$('[aria-label="متابعة"]') ||
-                          await page.$('button[data-testid="follow-button"]');
+      const followSelectors = [
+        '[aria-label="Follow"]',
+        '[aria-label="متابعة"]',
+        'button[data-testid="follow-button"]',
+        'button:has-text("Follow")',
+        'button:has-text("متابعة")',
+        'div[role="button"][tabindex="0"]',
+        'button[type="submit"]'
+      ];
+
+      let followButton = null;
       
+      for (const selector of followSelectors) {
+        try {
+          followButton = await page.waitForSelector(selector, { timeout: 5000 });
+          if (followButton) {
+            const isVisible = await followButton.isVisible();
+            if (isVisible) {
+              break;
+            }
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
       if (followButton) {
+        // التمرير إلى الزر
+        await followButton.scrollIntoViewIfNeeded();
+        await page.waitForTimeout(1000);
+        
+        // النقر على الزر
         await followButton.click();
-        logger.info('Page followed successfully');
-        return true;
+        
+        // انتظار للتأكد من نجاح العملية
+        await page.waitForTimeout(2000);
+        
+        // التحقق من تغيير حالة الزر
+        const isFollowing = await page.evaluate(() => {
+          const followingButton = document.querySelector('[aria-label="Following"]') || 
+                                document.querySelector('[aria-label="متابَع"]');
+          return !!followingButton;
+        });
+        
+        if (isFollowing) {
+          logger.info('Page followed successfully');
+          return true;
+        } else {
+          logger.warn('Follow action may not have been successful');
+          return false;
+        }
       } else {
         logger.warn('Follow button not found');
         return false;
@@ -201,12 +381,31 @@ class AutomationService {
       // الحصول على كوكي عامل
       const cookie = await this.getWorkingCookie();
       
-      // تهيئة المتصفح
+      // تهيئة المتصفح مع إعدادات محسنة
       await this.initBrowser();
       const page = await this.browser.newPage();
       
+      // إعدادات إضافية للصفحة
+      await page.setViewport({ width: 1366, height: 768 });
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      
       // تطبيق الكوكيز
       await this.applyCookies(page, cookie.cookie);
+      
+      // التحقق من تسجيل الدخول
+      await page.goto('https://www.facebook.com', { waitUntil: 'networkidle2', timeout: 30000 });
+      await page.waitForTimeout(3000);
+      
+      const isLoggedIn = await page.evaluate(() => {
+        return !document.querySelector('[data-testid="royal_login_button"]') && 
+               !document.querySelector('[aria-label="Log in to Facebook"]');
+      });
+      
+      if (!isLoggedIn) {
+        throw new Error('User not logged in with provided cookies');
+      }
+      
+      logger.info('Successfully logged in with cookies');
       
       let successCount = 0;
       const results = [];
@@ -233,19 +432,42 @@ class AutomationService {
           'أحسنت! 🌟',
           'ممتاز! 👏',
           'جميل جداً! 💫',
-          'أفكار رائعة! 🎯'
+          'أفكار رائعة! 🎯',
+          'محتوى مفيد جداً! 📚',
+          'شكراً للمشاركة! 🙏',
+          'معلومات قيمة! 💡',
+          'أداء ممتاز! ⭐',
+          'محتوى أصيل! 🎨',
+          'مفيد جداً! 🔥',
+          'أحسنت على هذا المحتوى! 🎉',
+          'ممتاز جداً! 🌟',
+          'محتوى رائع ومفيد! 📖',
+          'أفكار مميزة! 💎',
+          'محتوى قيم! 🏆',
+          'أداء رائع! 🎯',
+          'معلومات مفيدة! 📝',
+          'محتوى أصيل ومفيد! 🎭',
+          'أحسنت على هذا العمل! 🏅'
         ];
 
         for (let i = 0; i < order.comments; i++) {
-          const comment = comments[Math.floor(Math.random() * comments.length)];
+          // اختيار تعليق عشوائي مع تجنب التكرار
+          const usedComments = results.filter(r => r.type === 'comment' && r.comment).map(r => r.comment);
+          const availableComments = comments.filter(c => !usedComments.includes(c));
+          const comment = availableComments.length > 0 
+            ? availableComments[Math.floor(Math.random() * availableComments.length)]
+            : comments[Math.floor(Math.random() * comments.length)];
+          
           const success = await this.commentOnPost(page, order.targetUrl, comment);
           if (success) {
             successCount++;
-            results.push({ type: 'comment', success: true });
+            results.push({ type: 'comment', success: true, comment });
           } else {
-            results.push({ type: 'comment', success: false });
+            results.push({ type: 'comment', success: false, comment });
           }
-          await this.randomDelay(3000, 7000);
+          
+          // انتظار عشوائي أطول للتعليقات لتجنب الحظر
+          await this.randomDelay(5000, 10000);
         }
       }
 
@@ -293,11 +515,24 @@ class AutomationService {
       await this.updateOrderStatus(order._id, 'failed', null, 0, error.message);
 
       if (this.browser) {
-        await this.browser.close();
+        try {
+          await this.browser.close();
+        } catch (closeError) {
+          logger.error('Failed to close browser:', closeError);
+        }
         this.browser = null;
       }
 
       this.isRunning = false;
+      
+      // إعادة تشغيل الخدمة بعد فترة إذا كان الخطأ بسبب مشاكل تقنية
+      if (error.message.includes('Target closed') || error.message.includes('Session closed')) {
+        setTimeout(() => {
+          this.isRunning = false;
+          logger.info('Automation service reset after browser error');
+        }, 10000);
+      }
+      
       throw error;
     }
   }
