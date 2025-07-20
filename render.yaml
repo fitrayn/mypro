@@ -17,8 +17,10 @@ services:
         sync: false
       - key: FRONTEND_URL
         value: https://faceautomation.netlify.app
-      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+      - key: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
         value: "true"
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: "0"
     healthCheckPath: /api/health
     autoDeploy: true
 

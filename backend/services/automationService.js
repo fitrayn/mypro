@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer');
+const { chromium } = require('playwright');
 const Cookie = require('../models/Cookie');
 const Order = require('../models/Order');
 const User = require('../models/User');
@@ -13,7 +13,7 @@ class AutomationService {
 
   async initBrowser() {
     try {
-      this.browser = await puppeteer.launch({
+      this.browser = await chromium.launch({
         headless: true,
         args: [
           '--no-sandbox',
@@ -35,12 +35,11 @@ class AutomationService {
           '--disable-field-trial-config',
           '--disable-ipc-flooding-protection',
           '--memory-pressure-off',
-          '--max_old_space_size=4096'
+          '--max_old_space_size=2048'
         ],
-        ignoreDefaultArgs: ['--disable-extensions'],
         timeout: 30000
       });
-      logger.info('Browser initialized successfully for Render environment');
+      logger.info('Browser initialized successfully with Playwright');
     } catch (error) {
       logger.error('Failed to initialize browser:', error);
       throw error;
